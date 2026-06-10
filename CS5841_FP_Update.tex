@@ -1,0 +1,107 @@
+\documentclass[conference]{IEEEtran}
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{Removing Cross ECU Asynchronous Noise Coupling via Machine Learning Techniques}
+
+\author{
+    \IEEEauthorblockN{Jah Multani}
+    \IEEEauthorblockA{\textit{Michigan Technological University}}
+    \and
+    \IEEEauthorblockN{Jevin Barnett}
+    \IEEEauthorblockA{\textit{Michigan Technological University}}
+    \and
+    \IEEEauthorblockN{Kyle Hilderbrand}
+    \IEEEauthorblockA{\textit{Michigan Technological University}}
+}
+
+\maketitle
+
+\begin{abstract}
+This document outlines the progress made so far in developing, testing, and validating a model to remove noise from an analog signal on an embedded micro-controller. Research has been focused on proving that a DNN or CNN can effectively remove signal noise by training on a sliding window of inputs, and using that training to predict what the signal will look like with the noise removed. 
+\end{abstract}
+
+\begin{IEEEkeywords}
+machine learning, microcontroller, neural network
+\end{IEEEkeywords}
+
+\section{Introduction} Electronic control units (ECUs) often exchange and process analog measurements in electrically noisy environments. When multiple ECUs operate asynchronously, switching activity and differences in timing can couple interference into nearby signal paths, reducing measurement accuracy and potentially affecting downstream control decisions. This type of noise is commonly mitigated through shielding, filtering, improved grounding, or additional hardware components. Although these approaches can be effective, they may increase system cost, size, and design complexity. Machine-learning-based denoising provides an alternative approach in which a model learns the relationship between a corrupted measurement and its corresponding clean signal. In this work, supervised deep learning models are trained using paired noisy and expected output signals collected from an embedded system. Sliding windows of recent samples are used as model inputs so that the network can learn local temporal behavior rather than estimating each sample independently. A moving-average filter is used as a conventional baseline, while fully connected deep neural network and one-dimensional convolutional neural network architectures are evaluated as learned denoising methods. Deploying these models on a microcontroller introduces additional constraints. Neural-network inference requires repeated multiply-accumulate operations and storage for model parameters and intermediate activations. These requirements are manageable during training on desktop hardware but may produce unacceptable latency or memory usage on a resource-constrained STM32-class processor. Therefore, model performance must be evaluated using both signal-reconstruction accuracy and computational efficiency. The primary contributions of this work are the development and comparison of machine-learning models for removing asynchronous cross-ECU noise from a real analog measurement signal, the evaluation of these models against a moving-average baseline using reconstruction error and signal-to-noise ratio improvement, and the preparation of the best-performing model for embedded inference. The final model is selected by considering denoising performance together with its parameter count and expected execution requirements on the target microcontroller. 
+
+\section{Motivation}
+\section{Related Work}
+Signal denoising has traditionally been addressed using analytical filtering and transform-domain methods. Donoho introduced wavelet soft-thresholding as a method for reconstructing a clean signal by transforming a noisy observation into the wavelet domain and shrinking coefficients associated with noise \cite{b1}. Because this approach is mathematically defined, interpretable, and does not require training data, it provides a useful classical baseline for evaluating learned denoising models. However, fixed thresholding methods may be less effective when the noise is time-varying, non-Gaussian, or overlaps with meaningful features of the desired signal. More recent work has investigated neural networks for learning the relationship between noisy and clean time-series signals. Alkhafaji \textit{et al.} developed a lightweight one-dimensional convolutional neural network for the joint classification and denoising of communication signals in low-SNR edge environments \cite{b2}. Their architecture combined convolutional layers with batch normalization, dropout, and dense layers, demonstrating that a compact CNN can perform signal processing with relatively low inference latency. This work is particularly relevant because it considers both denoising quality and execution time, which are important constraints for deployment on resource-limited embedded hardware. Sun \textit{et al.} proposed an end-to-end one-dimensional residual convolutional neural network for removing artifacts from EEG signals \cite{b3}. Their approach trained the network using corrupted and clean signal pairs, allowing the model to learn temporal features directly from raw one-dimensional measurements. Although EEG signals differ from electrical measurements collected between electronic control units, both applications involve reconstructing an underlying time-series signal from measurements affected by structured and time-varying interference. The use of residual connections also demonstrates how a network can learn the noise or correction component rather than reconstructing the complete signal independently. These studies establish both classical wavelet denoising and learned one-dimensional neural networks as relevant approaches for signal reconstruction. However, they do not directly address asynchronous noise coupled across electronic control units or the deployment of a learned denoising model on an STM32-class microcontroller. The present work therefore evaluates DNN and lightweight 1D CNN models using paired noisy and clean measurements from the target embedded system. The models are compared against a moving-average baseline using reconstruction error, SNR improvement, and computational requirements for eventual embedded inference.  
+
+\section{Methodology}
+The dataset used in this work was collected from a real embedded system experiencing asynchronous noise coupling between electronic control units. The dataset contained approximately 2,500 time-ordered samples. Each sample included a noisy measurement and a corresponding expected output obtained after the original hardware issue was corrected. These paired signals allowed the denoising problem to be treated as a supervised regression task. Before training, the data was inspected for missing or invalid values and then divided chronologically into training, validation, and test sets. A chronological split was used instead of a random split because the data represented a continuous time-series signal. The input and output data were standardized using statistics calculated from the training set. A sliding-window approach was used to provide the models with information from multiple consecutive measurements. Each input contained the current noisy measurement and a fixed number of previous samples. The target output was defined as the difference between the noisy measurement and the expected clean measurement. Therefore, the model learned to predict a correction value rather than directly predicting the entire clean signal. The predicted clean value was calculated by adding the model's predicted correction to the noisy input. Two neural-network approaches were developed. The first was a fully connected deep neural network that accepted each signal window as a one-dimensional input vector. The second was a lightweight one-dimensional convolutional neural network designed to identify local patterns within the signal window. Both models were trained using the Adam optimizer and mean squared error as the loss function. Validation loss was monitored during training, and early stopping was used to reduce overfitting. The models were compared against the original noisy signal and moving-average filtering baselines. Performance was evaluated using mean squared error, root mean squared error, mean absolute error, and signal-to-noise ratio improvement. The model producing the best balance between signal reconstruction accuracy and computational complexity was selected for possible conversion and deployment on an STM32 microcontroller.
+
+An electric power steering ECU and motor was mounted to a dynamometer(dyno) system. A canape data collection was set for 2ms data acquisition. Specific signals were polled at 2ms data rates and stored in a MATLAB file. A script was written to export the data to excel. The dyno was rotating the motor at a slow speed of roughly 20rpm. This slow speed was to ensure the back emf from the motor would not exceed battery voltage to influence any data collection.  Signals were identified for collection by having a noisy characteristic due to electrical noise. This data was then trained on 1D CNN. The parameter was important because if a forward was to be implemented during runtime the computation time would be need to be minimal to not impact throughput of the system.
+
+\section{Experimental Results}
+\subsection{Classical Baseline}
+A classical baseline for noise removal was developed for the comparison and validation of the neural networks. Metrics used to benchmark various techniques include MSE, RMSE, and MAE. 
+\subsubsection{Filters}  One method commonly employed to remove noise from a signal is to use a filter\cite{b4}. Haslwanter discusses a variety of filters such as local regression smoothing, B-splines, and IIR/FIR filters. The infinite impulse response filter (IIR) was selected for its ability to remove noise that has a Gaussian distribution, as well as continuous/infinite effect which can produce a smoother output at the cost of being sensitive to large outliers and was implemented in Python using the scipy library.  A rolling average was applied to smooth out the signal. This was effective at removing the extreme nature of the noise, but the output is largely based on the magnitude of the noise, causing the rolling average to produce results that are not based on the clean signal, but based on the noise being centered around the clean signal. If the noise is consistently higher or lower than the clean signal, this will cause a steady error between the rolling average and the real value. Applying a 15 sample rolling average produced a baseline for comparison to the machine learning models. This output is shown in Figure \ref{fig:rollingAvg}.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=0.3\textwidth]{fig1.png}}
+\caption{Example of a figure caption.}
+\label{fig:rollingAvg}
+\end{figure}
+
+\subsection{MLP Theoretical Results}
+\subsection{1D CNN Theoretical Results}
+
+
+\section{Discussion}
+\section{Conclusion}
+
+\subsection{Figures and Tables}
+
+
+\begin{table}[htbp]
+\caption{SNR and MSE Comparison}
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Table}&\multicolumn{3}{|c|}{\textbf{Table Column Head}} \\
+\cline{2-4} 
+\textbf{Head} & \textbf{\textit{Table column subhead}}& \textbf{\textit{Subhead}}& \textbf{\textit{Subhead}} \\
+\hline
+copy& More table copy$^{\mathrm{a}}$& &  \\
+\hline
+\multicolumn{4}{l}{$^{\mathrm{a}}$Sample of a Table footnote.}
+\end{tabular}
+\label{tab1}
+\end{center}
+\end{table}
+
+
+
+
+\section*{Acknowledgment}
+
+
+\section*{References}
+
+Please number citations consecutively within brackets \cite{b1}.
+
+
+\begin{thebibliography}{00} \bibitem{b1} D. L. Donoho, ``De-noising by soft-thresholding,'' \textit{IEEE Transactions on Information Theory}, vol. 41, no. 3, pp. 613--627, May 1995, doi: 10.1109/18.382009. 
+
+\bibitem{b2} M. J. A. Alkhafaji, R. N. Mohammed, H. C. Mohammed, and M. A. N. Abed, ``Lightweight 1D CNN for unified real-time communication signal classification and denoising in low-SNR edge environments,'' \textit{Buletin Ilmiah Sarjana Teknik Elektro}, vol. 7, no. 3, pp. 496--508, 2025, doi: 10.12928/biste.v7i3.13789. 
+
+\bibitem{b3} W. Sun, Y. Su, X. Wu, and X. Wu, ``A novel end-to-end 1D-ResCNN model to remove artifact from EEG signals,'' \textit{Neurocomputing}, vol. 404, pp. 108--121, Sep. 2020, doi: 10.1016/j.neucom.2020.04.029. 
+
+\bibitem{b4} T. Haslwanter, Hands-on Signal Analysis with Python: An Introduction. Cham: Springer International Publishing, 2021. doi: 10.1007/978-3-030-57903-6.
+
+
+\end{thebibliography}
+
+\end{document}
